@@ -4,11 +4,11 @@ DeepSeek V4 flash 的**任务感知推理模式路由** Zcode 插件——原项
 
 > ## ⚠️ 重要说明
 >
+> - **本作者([shxtmaker](https://github.com/shxtmaker))只做了 Zcode 平台的移植适配工作;核心功能(路由机制设计、persona 文案、三带实测与结论)全部为原作者 yjh051108 完成并向其致谢。**
 > - 本仓库**只做了 Zcode 平台的适配验证**(Zcode 0.16.3,OpenCode go 与 Command Code 两家第三方平台的 DeepSeek V4 flash 端到端实测;国家超算 SCNet 完成端点/协议验证待 key)。
 > - 路由机制(persona、三带、首轮工具面、晋级、引导文案等)逐字移植自下列**原项目**,其效果与实测数据以原项目为准,本仓库未在 DeepSeek Harness 上复验:
 >   - 原项目一:**[dsh-router-standard](https://github.com/yjh051108/dsh-router-standard)**(v0.3 机制来源:任务感知推理模式路由预设)
 >   - 原项目二:**[dsh-routing-suite](https://github.com/yjh051108/dsh-routing-suite)**(配套套件)
-> - 作者:[shxtmaker](https://github.com/shxtmaker);致敬原作者 yjh051108 的开创性实测工作。
 
 ## 它做什么
 

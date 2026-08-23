@@ -61,9 +61,9 @@ B 层行为评审示例:`docs/b-layer-smoke.md`(靶项目 `docs/eval-fixture/`)�
 
 ## 致谢
 
-路由机制、persona 与引导文案逐字移植自原项目(**仅做了 Zcode 适配验证,原项目效果与实测以其仓库为准**):
+**本作者([shxtmaker](https://github.com/shxtmaker))只做了 Zcode 平台的移植适配工作;核心功能(路由机制设计、persona 文案、三带实测与结论)全部为原作者 yjh051108 完成**,致谢。以下为机制来源(**仅做了 Zcode 适配验证,原项目效果与实测以其仓库为准**):
 
 - [dsh-router-standard](https://github.com/yjh051108/dsh-router-standard)(v0.3 机制来源,MIT)
 - [dsh-routing-suite](https://github.com/yjh051108/dsh-routing-suite)(配套套件)
 
-本插件:MIT,作者 [shxtmaker](https://github.com/shxtmaker)。
+本插件适配部分:MIT。
