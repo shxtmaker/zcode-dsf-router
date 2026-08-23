@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>待办清单</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --text: #1f2328;
+    --muted: #8b949e;
+    --accent: #4f6ef7;
+    --accent-hover: #3b58dd;
+    --danger: #e5484d;
+    --border: #e4e7ec;
+    --done: #a0aab4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --card: #1e2228;
+      --text: #e6e8eb;
+      --muted: #7d8590;
+      --accent: #6b8aff;
+      --accent-hover: #8299ff;
+      --danger: #f27076;
+      --border: #2c313a;
+      --done: #565e69;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 48px 16px;
+  }
+  .container {
+    width: 100%;
+    max-width: 560px;
+  }
+  h1 {
+    font-size: 28px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  h1 span { font-size: 15px; color: var(--muted); font-weight: normal; }
+  .input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  #input {
+    flex: 1;
+    padding: 12px 14px;
+    font-size: 15px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card);
+    color: var(--text);
+    outline: none;
+  }
+  #input:focus { border-color: var(--accent); }
+  button {
+    cursor: pointer;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  #addBtn {
+    padding: 12px 20px;
+    background: var(--accent);
+    color: #fff;
+  }
+  #addBtn:hover { background: var(--accent-hover); }
+  .filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .filters button {
+    padding: 6px 14px;
+    background: transparent;
+    color: var(--muted);
+  }
+  .filters button.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .card {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  #list { list-style: none; }
+  .item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 10px;
+    border-radius: 10px;
+    transition: background .15s;
+  }
+  .item:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
+  .item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .item .text {
+    flex: 1;
+    font-size: 15px;
+    word-break: break-all;
+  }
+  .item.done .text {
+    color: var(--done);
+    text-decoration: line-through;
+  }
+  .item .time {
+    font-size: 12px;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .item .del {
+    background: transparent;
+    color: var(--muted);
+    font-size: 16px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    visibility: hidden;
+    flex-shrink: 0;
+  }
+  .item:hover .del { visibility: visible; }
+  .item .del:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 40px 0;
+    font-size: 14px;
+  }
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  #clearDone {
+    background: transparent;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  #clearDone:hover { color: var(--danger); }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>✅ 待办清单 <span id="count"></span></h1>
+  <div class="input-row">
+    <input id="input" type="text" placeholder="输入待办事项，回车添加…" autocomplete="off">
+    <button id="addBtn">添加</button>
+  </div>
+  <div class="filters">
+    <button data-filter="all" class="active">全部</button>
+    <button data-filter="active">未完成</button>
+    <button data-filter="done">已完成</button>
+  </div>
+  <div class="card">
+    <ul id="list"></ul>
+    <div class="empty" id="empty">暂无待办，添加一条吧 ✨</div>
+    <div class="footer">
+      <span id="remain">0 项未完成</span>
+      <button id="clearDone">清除已完成</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var KEY = 'todo.items.v1';
+  var filter = 'all';
+
+  var STORAGE = (function () {
+    try {
+      var t = '__todo_test__';
+      localStorage.setItem(t, '1');
+      localStorage.removeItem(t);
+      return localStorage;
+    } catch (e) {
+      var mem = {};
+      return {
+        getItem: function (k) { return k in mem ? mem[k] : null; },
+        setItem: function (k, v) { mem[k] = String(v); },
+        removeItem: function (k) { delete mem[k]; }
+      };
+    }
+  })();
+
+  var items = [];
+  try {
+    items = JSON.parse(STORAGE.getItem(KEY) || '[]');
+    if (!Array.isArray(items)) items = [];
+  } catch (e) { items = []; }
+
+  var listEl = document.getElementById('list');
+  var inputEl = document.getElementById('input');
+  var emptyEl = document.getElementById('empty');
+  var countEl = document.getElementById('count');
+  var remainEl = document.getElementById('remain');
+
+  function save() { STORAGE.setItem(KEY, JSON.stringify(items)); }
+
+  function visible() {
+    if (filter === 'active') return items.filter(function (i) { return !i.done; });
+    if (filter === 'done') return items.filter(function (i) { return i.done; });
+    return items;
+  }
+
+  function render() {
+    listEl.innerHTML = '';
+    var list = visible();
+    list.forEach(function (item) {
+      var li = document.createElement('li');
+      li.className = 'item' + (item.done ? ' done' : '');
+
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = item.done;
+      cb.addEventListener('change', function () {
+        item.done = cb.checked;
+        save();
+        render();
+      });
+
+      var text = document.createElement('span');
+      text.className = 'text';
+      text.textContent = item.text;
+
+      var time = document.createElement('span');
+      time.className = 'time';
+      time.textContent = item.time || '';
+
+      var del = document.createElement('button');
+      del.className = 'del';
+      del.title = '删除';
+      del.textContent = '✕';
+      del.addEventListener('click', function () {
+        items = items.filter(function (i) { return i !== item; });
+        save();
+        render();
+      });
+
+      li.appendChild(cb);
+      li.appendChild(text);
+      li.appendChild(time);
+      li.appendChild(del);
+      listEl.appendChild(li);
+    });
+
+    emptyEl.style.display = list.length ? 'none' : 'block';
+
+    var activeCount = items.filter(function (i) { return !i.done; }).length;
+    remainEl.textContent = activeCount + ' 项未完成';
+    countEl.textContent = items.length ? '（共 ' + items.length + ' 项）' : '';
+  }
+
+  function add() {
+    var text = inputEl.value.trim();
+    if (!text) return;
+    items.unshift({
+      text: text,
+      done: false,
+      time: new Date().toLocaleString('zh-CN', {
+        month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      })
+    });
+    inputEl.value = '';
+    save();
+    render();
+    inputEl.focus();
+  }
+
+  document.getElementById('addBtn').addEventListener('click', add);
+  inputEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') add();
+  });
+
+  document.querySelectorAll('.filters button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      filter = btn.dataset.filter;
+      document.querySelectorAll('.filters button').forEach(function (b) {
+        b.classList.toggle('active', b === btn);
+      });
+      render();
+    });
+  });
+
+  document.getElementById('clearDone').addEventListener('click', function () {
+    items = items.filter(function (i) { return !i.done; });
+    save();
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+# 参考仓库本地克隆(第三方,不入库)
+reference/
+
+# 本地 issue tracker
+.scratch/
+
+# 运行产物
+*.log
+nohup.out
+node_modules/

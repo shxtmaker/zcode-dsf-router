@@ -1,0 +1,27 @@
+{
+  "name": "zcode-dsf-router",
+  "version": "0.1.0",
+  "description": "Task-aware reasoning-mode router for DeepSeek V4 flash on Zcode — port of dsh-router-standard v0.3 (classify first user message, persona injection, first-turn tool surface, promote after first durable tool call). Requires provider pointed at the local proxy.",
+  "author": { "name": "lin-qingyue" },
+  "license": "MIT",
+  "commands": "commands",
+  "mcpServers": {
+    "zcode-dsf-router": {
+      "command": "/opt/ZCode/zcode",
+      "args": ["/opt/ZCode/resources/glm/zcode.cjs", "__zcode-plugin-host", "${ZCODE_PLUGIN_ROOT}/mcp/server.mjs"],
+      "env": {
+        "ELECTRON_RUN_AS_NODE": "1",
+        "DSF_ROUTER_PORT": "${user_config.port}",
+        "UPSTREAM_BASE_URL": "${user_config.upstream_base_url}",
+        "UPSTREAM_KIND": "${user_config.upstream_kind}",
+        "UPSTREAM_MODEL": "${user_config.upstream_model}"
+      }
+    }
+  },
+  "userConfig": {
+    "port": { "type": "string", "default": "8787", "description": "本地代理 HTTP 端口(provider baseURL 指向 http://127.0.0.1:<port>)" },
+    "upstream_kind": { "type": "string", "default": "openai", "description": "上游协议:openai 或 anthropic" },
+    "upstream_base_url": { "type": "string", "default": "", "description": "上游平台 baseURL,如 https://api.siliconflow.cn/v1" },
+    "upstream_model": { "type": "string", "default": "deepseek-v4-flash", "description": "上游模型 ID" }
+  }
+}

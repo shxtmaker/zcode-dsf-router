@@ -1,0 +1,22 @@
+# NOTICE
+
+## 原项目与出处
+
+本项目的路由机制移植自 yjh051108 的以下 MIT 项目:
+
+- **dsh-router-standard** — https://github.com/yjh051108/dsh-router-standard
+- **dsh-routing-suite** — https://github.com/yjh051108/dsh-routing-suite
+
+## 逐字移植清单(来自 dsh-router-standard v0.3)
+
+- 任务分类启发式(REACT_RE / SPEC_RE 两条正则与计数比较规则)
+- 三带阈值与量化(bandOf:0–0.19 spec / 0.2–0.49 transition 禁选 / ≥0.5 react;weak 第四模式)
+- persona 逐字文案:SPEC / REACT / WEAK_PRO(w6c)/ WEAK_FLASH(w7,含 recall 与 anti-runaway 锚点)/ RL 训练句
+- 首轮核心工具面:spec=read/edit/glob/grep,react 与 weak=read/write/edit(+平台 shell)
+- weak 近场引导逐字文案(GUIDE_WEAK / GUIDE_DEEP)与 isComplexTask 判定(>120 字符或架构关键词)
+- dev_router_status / dev_router_mode / dev_mode_subagent 的输入输出语义(parseMode 量化等)
+- 行为发现(persona 为行为带主触发器、工具面为次级条件、路径承诺、模式必须外部选择)均出自原项目的实测工作
+
+## 本仓库的改动范围
+
+仅做了 **Zcode 平台的适配**:本地代理(anthropic 收口 + OpenAI/Anthropic 双协议上游翻译 + 流式)、插件壳(manifest + MCP server + 斜杠命令,零 hooks)、无状态逐请求派生、平台预设。适配部分的实测(58 项机制断言、行为评审示例、OpenCode go / Command Code 端到端)仅覆盖 Zcode 0.16.3 环境,不构成对原项目结论的复验。
