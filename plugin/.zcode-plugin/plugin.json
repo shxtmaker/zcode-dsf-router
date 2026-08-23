@@ -1,8 +1,8 @@
 {
   "name": "zcode-dsf-router",
-  "version": "0.1.0",
-  "description": "Task-aware reasoning-mode router for DeepSeek V4 flash on Zcode — port of dsh-router-standard v0.3 (classify first user message, persona injection, first-turn tool surface, promote after first durable tool call). Requires provider pointed at the local proxy.",
-  "author": { "name": "lin-qingyue" },
+  "version": "0.2.0",
+  "description": "Task-aware reasoning-mode router for DeepSeek V4 flash on Zcode — port of dsh-router-standard v0.3 (classify first user message, persona injection, first-turn tool surface, promote after first durable tool call). /router:install for one-command onboarding.",
+  "author": { "name": "shxtmaker" },
   "license": "MIT",
   "commands": "commands",
   "mcpServers": {

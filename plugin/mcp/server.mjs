@@ -262,7 +262,7 @@ export function createRouter(cfg = loadConfig()) {
     readline.createInterface({ input: process.stdin }).on('line', async line => {
       let msg; try { msg = JSON.parse(line) } catch { return }
       const { id, method, params } = msg
-      if (method === 'initialize') return send({ jsonrpc: '2.0', id, result: { protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'zcode-dsf-router', version: '0.1.0' } } })
+      if (method === 'initialize') return send({ jsonrpc: '2.0', id, result: { protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'zcode-dsf-router', version: '0.2.0' } } })
       if (id === undefined) return   // notifications
       if (method === 'tools/list') return send({ jsonrpc: '2.0', id, result: { tools: TOOLS } })
       if (method === 'tools/call') {
