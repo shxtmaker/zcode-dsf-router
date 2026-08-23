@@ -37,10 +37,11 @@ Zcode ──(anthropic kind, http://127.0.0.1:8787)──▶ 本地路由代理(
 
 | 命令 | MCP 工具 | 作用 |
 |---|---|---|
+| `/router:install` | `router_providers` + `router_bind` + `router_install` | **一键接入**:扫描已接入供应商 → AskUserQuestion 弹窗选一个带 DeepSeek flash 模型的 → 自动绑上游(复制其 baseURL/model/key)并注册模型列表条目(带备份、幂等) |
 | `/router:status` | `router_status` | 各会话 mode/band/persona/首轮工具面/override/晋级 |
 | `/router:mode <spec\|react\|weak\|mixed\|0-100\|auto>` | `router_mode` | 显式切档(下一请求生效;数值量化到三带,mixed 仅显式) |
 | `/router:subagent <mode> <task>` | `router_subagent` | 隔离单轮换模子任务(无工具,轨迹零污染) |
-| `/router:setup [平台]` | `router_config` | 接入向导 / 平台预设一键切换 |
+| `/router:setup [平台]` | `router_config` | 平台预设切换 / 手动配置向导 |
 
 变体:`DSF_VARIANT=rl-minimal` = RL 极简模式(整个 system 替换为 RL 训练句 + Bash/Edit 两工具面)。
 

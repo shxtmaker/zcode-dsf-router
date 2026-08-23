@@ -27,7 +27,9 @@ Zcode ──(anthropic kind, http://127.0.0.1:8787)──▶ 本地路由代理(
 
 ## 快速开始
 
-见 **[plugin/README.md](plugin/README.md)**(部署、provider 注册模板、平台预设、key 通道、命令表、验证方式)。支持的平台预设:`deepseek-official` / `siliconflow` / `volc-ark` / `scnet` / `opencode` / `commandcode` / `openrouter` / `bailian` / `together` / `fireworks`。
+**最简接入**:在 Zcode 里输入 `/router:install` —— 自动扫描你已接入的供应商、**弹出选项**列出带 DeepSeek V4 flash 模型的那些,选中后自动绑定上游(复制其 baseURL/模型/key,不回显)并注册模型列表条目(带时间戳备份、幂等),然后 `/model` 选「dsf-router」即启用。
+
+或按 **[plugin/README.md](plugin/README.md)** 手动部署(平台预设、key 通道、命令表、验证方式)。支持的平台预设:`deepseek-official` / `siliconflow` / `volc-ark` / `scnet` / `opencode` / `commandcode` / `openrouter` / `bailian` / `together` / `fireworks`。
 
 ## 仓库结构
 

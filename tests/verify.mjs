@@ -4,7 +4,7 @@ import http from 'node:http'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { createRouter, loadConfig } from '../plugin/mcp/server.mjs'
+import { createRouter, loadConfig, scanV2Providers, installRouterProvider } from '../plugin/mcp/server.mjs'
 import { rewrite, classifyTask, personaFor, GUIDE_WEAK, GUIDE_DEEP, SPEC_PERSONA, REACT_PERSONA, WEAK_FLASH } from '../plugin/mcp/router-core.mjs'
 
 let pass = 0, fail = 0
@@ -171,6 +171,28 @@ ok('显式参数可覆盖 preset', (await routerC.toolCall('router_config', { pr
 ok('非法 preset 拒绝并给出名单', (await routerC.toolCall('router_config', { preset: 'nope' })).includes('invalid preset') && (await routerC.toolCall('router_config', { preset: 'nope' })).includes('scnet'))
 delete process.env.ZCODE_PLUGIN_DATA
 fs.rmSync(tdir, { recursive: true, force: true })
+
+// ---------- 供应商扫描与一键安装 ----------
+console.log('供应商扫描与一键安装(scanV2Providers / installRouterProvider)')
+const v2f = path.join(os.tmpdir(), 'dsf-v2-fixture.json')
+fs.writeFileSync(v2f, JSON.stringify({ provider: {
+  aaa: { name: 'opencode go', kind: 'openai-compatible', options: { apiKey: 'sk-real-key', baseURL: 'https://opencode.ai/zen/go/v1' }, models: { 'deepseek-v4-flash': {}, 'ox-alpha-free': {} } },
+  bbb: { name: 'command code', kind: 'openai-compatible', options: { apiKey: 'sk-2', baseURL: 'https://api.commandcode.ai/provider/v1' }, models: { 'deepseek/deepseek-v4-flash': {} } },
+  ccc: { name: 'GLM', kind: 'anthropic', options: { apiKey: 'k', baseURL: 'https://x' }, models: { 'GLM-5.3': {} } },
+  ddd: { name: 'dsf-router (V4 flash 任务感知路由)', kind: 'anthropic', options: { baseURL: 'http://127.0.0.1:8787' }, models: { 'deepseek-v4-flash': {} } },
+} }))
+const scanned = scanV2Providers(v2f)
+ok('扫描:只列 flash 供应商并排除自身', scanned.length === 2 && scanned.some(v => v.name === 'opencode go') && scanned.some(v => v.models.includes('deepseek/deepseek-v4-flash')))
+ok('扫描:apiKey 不外泄', JSON.stringify(scanned).includes('sk-real-key') === false && scanned.every(v => v.keySet === true))
+const ins1 = installRouterProvider(v2f, { model: 'deepseek-v4-flash', port: 8787 })
+const after1 = JSON.parse(fs.readFileSync(v2f, 'utf8'))
+ok('安装:新增条目并留备份', Object.values(after1.provider).filter(v => (v.name || '').startsWith('dsf-router')).length === 1 && fs.existsSync(ins1.backup))
+const cnt = Object.keys(after1.provider).length
+const ins2 = installRouterProvider(v2f, { model: 'deepseek/deepseek-v4-flash', port: 8787 })
+const after2 = JSON.parse(fs.readFileSync(v2f, 'utf8'))
+ok('安装:幂等更新不重复', ins2.updated === true && ins2.key === ins1.key && Object.keys(after2.provider).length === cnt)
+ok('安装:模型随上游更新', Object.keys(after2.provider[ins2.key].models)[0] === 'deepseek/deepseek-v4-flash')
+fs.rmSync(v2f, { force: true }); fs.rmSync(ins1.backup, { force: true }); fs.rmSync(ins2.backup, { force: true })
 
 console.log(`\n结果:${pass} 通过,${fail} 失败`)
 routerA.httpServer?.close(); routerB.httpServer?.close(); routerC.httpServer?.close(); echo.close()

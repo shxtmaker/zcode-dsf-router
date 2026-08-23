@@ -9,6 +9,7 @@
 import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
+import os from 'node:os'
 import crypto from 'node:crypto'
 import readline from 'node:readline'
 import { rewrite, bandOf, bandFor, parseMode, personaFor, coreFor, testinessFor, userTextOf, blockText } from './router-core.mjs'
@@ -17,6 +18,42 @@ import { PRESETS, presetNames } from './presets.mjs'
 
 const uuid = () => crypto.randomUUID()
 export const configFilePath = () => (process.env.ZCODE_PLUGIN_DATA ? path.join(process.env.ZCODE_PLUGIN_DATA, 'config.json') : null)
+export const v2ConfigPath = () => process.env.DSF_V2_CONFIG || path.join(os.homedir(), '.zcode', 'v2', 'config.json')
+
+// 扫描 Zcode 已接入供应商,挑出带 DeepSeek flash 系模型的(apiKey 永不外泄,只报 keySet)
+const FLASH_MODEL_RE = /deepseek[\w./-]*flash|flash[\w./-]*deepseek/i
+export function scanV2Providers(p = v2ConfigPath()) {
+  let raw
+  try { raw = JSON.parse(fs.readFileSync(p, 'utf8')) } catch { return [] }
+  const out = []
+  for (const [id, v] of Object.entries(raw.provider || {})) {
+    if ((v.name || '').toLowerCase().startsWith('dsf-router')) continue   // 自己的条目不算
+    const models = Object.keys(v.models || {}).filter(m => FLASH_MODEL_RE.test(m))
+    if (!models.length || !v.options?.baseURL) continue
+    out.push({ providerId: id, name: v.name, baseURL: v.options.baseURL, kind: v.kind === 'anthropic' ? 'anthropic' : 'openai', models, keySet: !!v.options.apiKey })
+  }
+  return out
+}
+// 在 v2/config.json 里幂等 upsert 本地路由 provider 条目(先备份;不动其他条目)
+export function installRouterProvider(p = v2ConfigPath(), { model, port = 8787 } = {}) {
+  let raw
+  try { raw = JSON.parse(fs.readFileSync(p, 'utf8')) } catch { return { error: `cannot read ${p}` } }
+  raw.provider = raw.provider || {}
+  let key = Object.keys(raw.provider).find(k => (raw.provider[k].name || '').toLowerCase().startsWith('dsf-router'))
+  const updated = !!key
+  if (!key) key = uuid()
+  raw.provider[key] = {
+    name: 'dsf-router (V4 flash 任务感知路由)',
+    kind: 'anthropic',
+    options: { apiKey: 'dsf-local-proxy', baseURL: `http://127.0.0.1:${port}`, apiKeyRequired: false },
+    source: 'custom',
+    models: { [model]: { reasoning: { enabled: true, variants: ['off', 'high', 'max'], defaultVariant: 'max' }, limit: { context: 1000000, output: 384000 }, modalities: { input: ['text'], output: ['text'] }, zcode: { modified: false, priority: 99 } } },
+  }
+  const bak = `${p}.bak-dsf-${new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)}`
+  fs.copyFileSync(p, bak)
+  fs.writeFileSync(p, JSON.stringify(raw, null, 2) + '\n')
+  return { key, updated, backup: bak, model, port }
+}
 export function loadConfig() {
   const cfg = {
     port: +(process.env.DSF_ROUTER_PORT || 8787),
@@ -145,6 +182,30 @@ export function createRouter(cfg = loadConfig()) {
       const head = changed.length ? `已更新 ${changed.join(', ')}` : '当前配置(未改动)'
       return `${head};${persisted ? '已写入 ' + (view.file || '') : '未持久化(需设置 ZCODE_PLUGIN_DATA,仅本次进程内生效)'}\nupstream=${view.upstreamKind} baseURL=${view.baseURL || '(未配置)'} model=${view.model} port=${view.port} keySet=${view.keySet} (apiKey 不回显)`
     }
+    if (name === 'router_providers') {
+      const list = scanV2Providers()
+      if (!list.length) return '未发现带 DeepSeek flash 系模型的已接入供应商(~/.zcode/v2/config.json)。可先用 /router:setup 的平台预设,或手动在 Zcode 里接入平台后再试。'
+      return '已接入且带 DeepSeek flash 模型的供应商:\n' + list.map(v => `  providerId=${v.providerId}  ${v.name}  [${v.kind}] ${v.baseURL}\n    模型: ${v.models.join(', ')}  keySet=${v.keySet}`).join('\n')
+    }
+    if (name === 'router_bind') {
+      const list = scanV2Providers()
+      const hit = list.find(v => v.providerId === args?.providerId)
+      if (!hit) return `invalid providerId "${args?.providerId}": 先调 router_providers 查看`
+      const p = (JSON.parse(fs.readFileSync(v2ConfigPath(), 'utf8')).provider || {})[hit.providerId]
+      const model = hit.models.includes(args?.model) ? args.model : hit.models[0]
+      cfg.upstreamBase = hit.baseURL
+      cfg.upstreamKind = hit.kind
+      cfg.upstreamModel = model
+      cfg.upstreamKey = p?.options?.apiKey || ''
+      saveConfig(cfg)
+      if (!cfg.upstreamKey) log('WARNING: 所选供应商无 apiKey,上游请求将 401')
+      return `已绑定上游: ${hit.name} → ${cfg.upstreamBase} (${cfg.upstreamKind}) model=${model} keySet=${!!cfg.upstreamKey}(${hit.providerId})`
+    }
+    if (name === 'router_install') {
+      const r = installRouterProvider(v2ConfigPath(), { model: cfg.upstreamModel, port: cfg.port })
+      if (r.error) return `install error: ${r.error}`
+      return `已${r.updated ? '更新' : '注册'}模型列表条目「dsf-router (V4 flash 任务感知路由)」(模型 ${r.model} → 本地代理 :${r.port};备份 ${path.basename(r.backup)})。现在 /model 选择它即可启用任务感知路由;不想用时在模型列表里删除该条目即可(代理与命令不受影响)。`
+    }
     if (name === 'router_subagent') {
       const mode = parseMode(args?.mode)
       if (mode === null) return `invalid mode "${args?.mode}"`
@@ -177,6 +238,15 @@ export function createRouter(cfg = loadConfig()) {
   }, {
     name: 'router_mode', description: "Set a session's reasoning mode: spec (plan-first) / weak (internal routing) / mixed (transition, trap) / react (doer). Accepts band names, 0-100, or 0.0-1.0; use auto to return to task classification. The next request applies it.",
     inputSchema: { type: 'object', properties: { mode: { type: 'string', description: 'spec|weak|mixed|react|0-100|0.0-1.0|auto' }, sessionKey: { type: 'string', description: 'session key from router_status; defaults to most recent' } }, required: ['mode'], additionalProperties: false },
+  }, {
+    name: 'router_providers', description: 'Scan already-connected Zcode providers (~/.zcode/v2/config.json) and list those serving DeepSeek flash-family models (with providerId/name/baseURL/kind/models/keySet; apiKey never returned). Use before router_bind.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  }, {
+    name: 'router_bind', description: 'Point the routing proxy upstream at one of the already-connected providers (copies baseURL/kind/model and its apiKey server-side; key never echoed). Get providerId from router_providers.',
+    inputSchema: { type: 'object', properties: { providerId: { type: 'string', description: 'provider key from router_providers' }, model: { type: 'string', description: 'one of the provider\'s flash models; defaults to first' } }, required: ['providerId'], additionalProperties: false },
+  }, {
+    name: 'router_install', description: 'Register (or update) the local routing provider entry in the Zcode model list, pointing at this proxy (idempotent, timestamped backup first; model = current upstream model). After install, select it via /model to activate task-aware routing.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   }, {
     name: 'router_subagent', description: 'Run one task in a DIFFERENT reasoning mode inside an isolated single-shot context (its own persona as system, no tools, current trajectory untouched). Mode isolation is the only reliable way to change modes mid-session.',
     inputSchema: { type: 'object', properties: { mode: { type: 'string', description: 'spec|weak|mixed|react|0-100' }, task: { type: 'string', description: 'the task text' }, maxTokens: { type: 'number', description: 'default 1024' } }, required: ['mode', 'task'], additionalProperties: false },
