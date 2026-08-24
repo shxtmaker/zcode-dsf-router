@@ -256,21 +256,32 @@ export function createRouter(cfg = loadConfig()) {
   }]
   const send = obj => process.stdout.write(JSON.stringify(obj) + '\n')
 
+  const tryListen = () => new Promise(ok => {
+    httpServer.once('error', err => { if (err.code === 'EADDRINUSE') ok(false); else { log('listen error:', err.code || err.message); ok(false) } })
+    httpServer.listen(cfg.port, '127.0.0.1', () => ok(true))
+  })
+  process.on('uncaughtException', e => log('uncaught:', e.message))   // 单个坏请求不杀掉整个代理
+  setInterval(() => {}, 60000)   // 防事件循环空转(stdio 断连但宿主仍持有)
+  readline.createInterface({ input: process.stdin }).on('line', async line => {
+    let msg; try { msg = JSON.parse(line) } catch { return }
+    const { id, method, params } = msg
+    if (method === 'initialize') return send({ jsonrpc: '2.0', id, result: { protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'zcode-dsf-router', version: '0.2.0' } } })
+    if (id === undefined) return   // notifications
+    if (method === 'tools/list') return send({ jsonrpc: '2.0', id, result: { tools: TOOLS } })
+    if (method === 'tools/call') {
+      try { const text = await toolCall(params?.name, params?.arguments); send({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: String(text) }] } }) }
+      catch (e) { send({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: 'error: ' + e.message }], isError: true } }) }
+    }
+  })
+
   async function start() {
-    try { await new Promise((ok, err) => { httpServer.once('error', err); httpServer.listen(cfg.port, '127.0.0.1', ok) }); primary = true }
-    catch { primary = false }
-    readline.createInterface({ input: process.stdin }).on('line', async line => {
-      let msg; try { msg = JSON.parse(line) } catch { return }
-      const { id, method, params } = msg
-      if (method === 'initialize') return send({ jsonrpc: '2.0', id, result: { protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'zcode-dsf-router', version: '0.2.0' } } })
-      if (id === undefined) return   // notifications
-      if (method === 'tools/list') return send({ jsonrpc: '2.0', id, result: { tools: TOOLS } })
-      if (method === 'tools/call') {
-        try { const text = await toolCall(params?.name, params?.arguments); send({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: String(text) }] } }) }
-        catch (e) { send({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: 'error: ' + e.message }], isError: true } }) }
-      }
-    })
-    log(`MCP ready (stdio). HTTP ${primary ? `listening :${cfg.port}` : `delegated to :${cfg.port} (single-instance)`}. variant=${cfg.variant} upstream=${cfg.upstreamKind} ${cfg.upstreamBase ? cfg.upstreamBase.replace(/\/\/[^@]*@/, '//') : '(unconfigured)'}`)
+    primary = await tryListen()
+    if (!primary) {
+      const probe = await fetch(`http://127.0.0.1:${cfg.port}/__status`).then(r => r.ok).catch(() => false)
+      if (!probe) { await new Promise(r => httpServer.close(r)); primary = await tryListen(); log(`主实例无响应,本实例已自动接管 :${cfg.port}`) }
+      else log(`secondary 运行中(主实例存活 :${cfg.port})`)
+    }
+    log(`MCP ready (stdio). variant=${cfg.variant} upstream=${cfg.upstreamKind} ${cfg.upstreamBase ? cfg.upstreamBase.replace(/\/\/[^@]*@/, '//') : '(unconfigured)'} ${primary ? `[primary :${cfg.port}]` : `[secondary]`}`)
     if (cfg.upstreamBase && !cfg.upstreamKey) log(`WARNING: 上游已配置但 apiKey 为空——上游请求将返回 401。调用 router_config 工具写入 apiKey(${configFilePath() || '需设置 ZCODE_PLUGIN_DATA'})`)
     return { primary, cfg, httpServer, overrides, seen, fmtStatus, toolCall }
   }
